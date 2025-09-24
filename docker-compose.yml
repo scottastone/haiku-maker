@@ -1,0 +1,10 @@
+services:
+  web:
+    container_name: haiku_validator
+    build: .
+    ports:
+      - "6767:6767"
+    volumes:
+      - .:/app
+    environment:
+      - FLASK_ENV=production
