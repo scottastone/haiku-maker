@@ -232,7 +232,8 @@ SYLLABLE_OVERRIDES = {
     "hour": 1,
     "smile": 1,
     "smiled": 1,
-    "miles": 1
+    "miles": 1,
+    "are": 1
 }
 
 def analyze_line(line):
