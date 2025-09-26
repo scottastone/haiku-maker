@@ -9,14 +9,13 @@ import re
 app = Flask(__name__)
 
 # --- HTML & JavaScript Template ---
-# All the frontend code is embedded here for simplicity.
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Haiku Syllable Counter</title>
+    <title>haiku validator</title>
     <style>
         :root {
             --bg-color: #1a1a1a;
@@ -62,13 +61,13 @@ HTML_TEMPLATE = """
         }
         #haiku-input {
             width: 100%;
-            height: 200px;
+            height: 225px;
             background-color: var(--bg-color);
             color: var(--text-color);
             border: 1px solid var(--border-color);
             border-radius: 8px;
             padding: 1rem;
-            font-size: 1.1rem;
+            font-size: 2rem;
             resize: none;
             box-sizing: border-box;
             transition: border-color 0.3s;
@@ -81,8 +80,9 @@ HTML_TEMPLATE = """
             background-color: var(--bg-color);
             padding: 1rem;
             border-radius: 8px;
-            height: 200px;
+            height: 225px;
             overflow-y: auto;
+            box-sizing: border-box;
             border: 1px solid var(--border-color);
         }
         .line-analysis {
@@ -132,14 +132,23 @@ HTML_TEMPLATE = """
         </header>
         
         <div>
-            <textarea id="haiku-input" placeholder="type your haiku here..."></textarea>
+            <textarea id="haiku-input" placeholder="type your haiku here..." maxlength="1000"></textarea>
         </div>
 
         <div id="analysis-results">
-            <p style="color: #888;">waiting for input...</p>
+            <p style="color: #888;"></p>
         </div>
         
         <div id="haiku-status"></div>
+
+        <footer style="grid-column: 1 / -1; text-align: center; margin-top: 2rem; font-size: 0.8rem; color: #666;">
+            made by scott stone using 
+            <code style="font-family: 'Courier New', Courier, monospace;"><a href="https://flask.palletsprojects.com/" target="_blank" style="color: #666;">Flask</a></code> 
+            and 
+            <code style="font-family: 'Courier New', Courier, monospace;"><a href="https://pypi.org/project/syllables/" target="_blank" style="color: #666;">syllables</a></code>.
+            <br>
+            <a href="/overrides" style="color: #666; text-decoration: none;">view syllable overrides file</a>
+        </footer>
     </div>
 
     <script>
@@ -152,12 +161,12 @@ HTML_TEMPLATE = """
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(() => {
                 analyzeText(haikuInput.value);
-            }, 300); // Wait 300ms after user stops typing
+            }, 100); // Wait 300ms after user stops typing
         });
 
         async function analyzeText(text) {
             if (!text.trim()) {
-                analysisResults.innerHTML = '<p style="color: #888;">waiting for input...</p>';
+                analysisResults.innerHTML = '<p style="color: #888;"></p>';
                 haikuStatus.textContent = '';
                 return;
             }
@@ -205,10 +214,10 @@ HTML_TEMPLATE = """
             });
 
             if (data.is_haiku) {
-                haikuStatus.textContent = "It's a perfect Haiku! 🎉";
+                haikuStatus.textContent = "haiku detected!";
                 haikuStatus.style.color = 'var(--success-color)';
             } else {
-                haikuStatus.textContent = "Keep writing...";
+                haikuStatus.textContent = "keep writing...";
                 haikuStatus.style.color = 'var(--text-color)';
             }
         }
@@ -220,22 +229,16 @@ HTML_TEMPLATE = """
 # --- Backend Logic ---
 
 # Dictionary for manual syllable count overrides for common miscounted words
-SYLLABLE_OVERRIDES = {
-    "there": 1,
-    "their": 1,
-    "they're": 1,
-    "here": 1,
-    "where": 1,
-    "were": 1,
-    "we're": 1,
-    "fire": 1,
-    "hour": 1,
-    "smile": 1,
-    "smiled": 1,
-    "miles": 1,
-    "are": 1
-}
-
+SYLLABLE_OVERRIDES = {}
+SYLLABLE_OVERRIDES_FILE = "syllable_overrides.txt"
+def load_syllable_overrides(filename: str):
+    """Loads syllable overrides from a file."""
+    with open(filename, 'r') as file:
+        lines = file.readlines()
+        for line in lines:
+            word, count = line.strip().split(':')
+            SYLLABLE_OVERRIDES[word] = int(count)
+        
 def analyze_line(line):
     """Analyzes a single line of text for syllable count and breakdown."""
     # Updated regex to include apostrophes within words
@@ -265,11 +268,20 @@ def analyze_line(line):
 @app.route('/')
 def index():
     """Renders the main HTML page."""
+    load_syllable_overrides(SYLLABLE_OVERRIDES_FILE)
     return render_template_string(HTML_TEMPLATE)
+
+@app.route('/overrides', methods=['GET'])
+def show_overrides():
+    """Renders a page showing all syllable overrides."""
+    load_syllable_overrides(SYLLABLE_OVERRIDES_FILE) # Ensure overrides are loaded
+    with open(SYLLABLE_OVERRIDES_FILE, 'r') as file:
+        content = file.read()
+    return f"{content}", 200, {'Content-Type': 'text/plain'}
 
 @app.route('/analyze', methods=['POST'])
 def analyze():
-    """API endpoint to analyze text and return syllable counts."""
+    """simple API endpoint to analyze text and return syllable counts."""
     data = request.get_json()
     text = data.get('text', '')
     lines = text.split('\n')
@@ -293,8 +305,5 @@ def analyze():
         "is_haiku": is_haiku
     })
 
-# --- Main Execution ---
 if __name__ == '__main__':
-    # Use port 8080 for broader compatibility with cloud environments
     app.run(host='0.0.0.0', port=8080)
-
